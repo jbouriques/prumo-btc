@@ -31,15 +31,23 @@ if not IS_CLOUD:
 
 @st.cache_data(ttl=30)
 def get_data():
-    try:
-        r = requests.get("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100", timeout=15)
-        j = r.json()
-        if not isinstance(j, list): return None
-        df = pd.DataFrame(j, columns=["a","b","c","d","close","e","f","g","h","i","j","k"])
-        df["close"] = pd.to_numeric(df["close"], errors='coerce')
-        df = df.dropna()
-        return df if len(df) > 20 else None
-    except: return None
+    urls = [
+        "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100",
+        "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100",
+        "https://api1.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100"
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=10)
+            j = r.json()
+            if isinstance(j, list) and len(j) > 20:
+                df = pd.DataFrame(j, columns=["a","b","c","d","close","e","f","g","h","i","j","k"])
+                df["close"] = pd.to_numeric(df["close"], errors='coerce')
+                df = df.dropna()
+                if len(df) > 20:
+                    return df
+        except: continue
+    return None
 
 df = get_data()
 
