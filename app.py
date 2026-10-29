@@ -2,7 +2,6 @@ import streamlit as st, requests, pandas as pd, numpy as np, plotly.graph_object
 st.set_page_config(page_title="Prumo BTC V1.3", layout="wide")
 st.title("🔵 Prumo BTC V1.3 - Alta e Baixa")
 
-# PEGA TOKEN SEGURO (na nuvem vem do secrets, no PC vem da sidebar)
 try:
     TOKEN = st.secrets["TOKEN"]
     CHAT_ID = st.secrets["CHAT_ID"]
@@ -12,7 +11,7 @@ except:
     st.sidebar.header("🚨 Config Telegram")
     TOKEN = st.sidebar.text_input("TOKEN do BotFather", type="password")
     CHAT_ID = st.sidebar.text_input("Chat ID", value="1217625894")
-    
+
 ENABLE = st.sidebar.checkbox("Ativar alertas >70%", value=True)
 
 def send_telegram(msg):
@@ -26,18 +25,23 @@ def send_telegram(msg):
 if not IS_CLOUD:
     if st.sidebar.button("🔔 TESTAR ALTA E BAIXA", type="primary", use_container_width=True):
         send_telegram("✅ *PRUMO V1.3 CONECTADO!* \n\nAgora você recebe:\n🚀 ALTA >70%\n🔻 BAIXA >70%")
-        st.sidebar.success("Enviado! Olha Telegram")
+        st.sidebar.success("Enviado!")
         st.balloons()
 
 @st.cache_data(ttl=30)
 def get_data():
-    d = requests.get("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100", timeout=10).json()
-    df = pd.DataFrame(d); df["close"] = df[4].astype(float); return df
+    data = requests.get("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100", timeout=10).json()
+    df = pd.DataFrame(data, columns=["a","b","c","d","close","e","f","g","h","i","j","k"])
+    df["close"] = pd.to_numeric(df["close"])
+    return df
 
-df = get_data(); close = df["close"]; y = close.values[-60:]
-x = np.arange(len(y)); slope, intercept = np.polyfit(x, y, 1)
-future_x = np.arange(len(y), len(y)+12); proj = slope * future_x + intercept
-std = np.std(y - (slope*x + intercept))
+df = get_data()
+close = df["close"]
+y = close.values[-60:]
+x = np.arange(len(y))
+slope, intercept = np.polyfit(x, y, 1)
+future_x = np.arange(len(y), len(y)+12)
+proj = slope * future_x + intercept
 prob_alta = max(5, min(95, 50 + slope*5000))
 
 c1,c2,c3 = st.columns(3)
@@ -50,16 +54,16 @@ fig.add_trace(go.Scatter(y=y, name="Real", line=dict(color="#0a66ff", width=3)))
 fig.add_trace(go.Scatter(x=list(future_x), y=proj, name="Prumo 1h", line=dict(color="#ff9f0a", dash="dash", width=3)))
 st.plotly_chart(fig, use_container_width=True)
 
-# LÓGICA DE ALERTA DUPLA
 if ENABLE:
     if prob_alta >= 70:
-        send_telegram(f"🚀 *SINAL DE ALTA {prob_alta:.0f}%* \nBTC: ${close.iloc[-1]:,.0f} \nAlvo 1h: ${proj[-1]:,.0f}\n_Estratégia: compra com stop 0,8%_")
+        send_telegram(f"🚀 *SINAL DE ALTA {prob_alta:.0f}%* \nBTC: ${close.iloc[-1]:,.0f} \nAlvo 1h: ${proj[-1]:,.0f}")
         st.success("Sinal de ALTA enviado!")
     elif prob_alta <= 30:
         prob_baixa = 100 - prob_alta
-        send_telegram(f"🔻 *SINAL DE BAIXA {prob_baixa:.0f}%* \nBTC: ${close.iloc[-1]:,.0f} \nAlvo 1h: ${proj[-1]:,.0f}\n_Estratégia: venda/short ou fica fora_")
+        send_telegram(f"🔻 *SINAL DE BAIXA {prob_baixa:.0f}%* \nBTC: ${close.iloc[-1]:,.0f} \nAlvo 1h: ${proj[-1]:,.0f}")
         st.error(f"Sinal de BAIXA {prob_baixa:.0f}% enviado!")
 
 if IS_CLOUD:
     st.info("☁️ Rodando 24h na nuvem. Atualiza a cada 60s")
-    time.sleep(60); st.rerun()
+    time.sleep(60)
+    st.rerun()
